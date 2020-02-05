@@ -133,8 +133,17 @@ ui <- fluidPage(theme = shinytheme("paper"), #https://www.rdocumentation.org/pac
                                      
                                      h3(" "),
                                      
-                                     p(strong("xxxxx")) ,
+                                     p(strong("Left panel, active group. Observed responders in blue. But **EVERYBODY** responded to the drug **EQUALLY** ! Apparent individual difference is due **ENTIRELY** to 
+                                              random within subject error, measurement error and regression to the mean.")) ,
+                                  #   verbatimTextOutput("A"),
+                                     p(strong("Right panel, control group. Observed responders in blue. But in truth **NO ONE** responded, apparent individual difference is due **ENTIRELY** to random within subject error,
+                                              measurement error and regression to the mean..")) ,
                                      
+                                   #  verbatimTextOutput("C"),
+                                     
+                                   #  DT::dataTableOutput("tablex"),
+                                     
+                                   div( verbatimTextOutput("xx")),
                                      p(strong("Total sample size:")),
 
                                    verbatimTextOutput("summaryx3")
@@ -158,7 +167,9 @@ ui <- fluidPage(theme = shinytheme("paper"), #https://www.rdocumentation.org/pac
                             tabPanel("Statistical modelling", value=6, 
                                      h4("Modelling"),
                                      p(strong("xxxxxxxxxxxxxxxxxxxxxx.")),
-                                   div( verbatimTextOutput("reg.summary")),
+                                   div( verbatimTextOutput("reg.summary2")),
+                                   p(strong("xxxxxxxxxxxxxxxxxxxxxx.")),
+                                   div( verbatimTextOutput("reg.summary3")),
                                 ) ,
                             
                             #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -272,7 +283,7 @@ server <- shinyServer(function(input, output   ) {
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     
-    fit <- renderPrint({
+    fit <- reactive({
         
       d <- make.data()$d
       f0 <- lm(y.1observed ~ y.0observed + treat, d)
@@ -286,6 +297,16 @@ server <- shinyServer(function(input, output   ) {
     output$reg.summary <- renderPrint({
        
         return(fit()$f0)
+      
+    })
+    output$reg.summary2 <- renderPrint({
+      
+      return(fit()$s)
+      
+    })
+    output$reg.summary3 <- renderPrint({
+      
+      return(fit()$ci)
       
     })
     
@@ -338,7 +359,7 @@ server <- shinyServer(function(input, output   ) {
         abline(h=input$trt)
         # this many were not observed to have reduced response by more than 5
         # wrongly labelled as 'non responders'
-        mean(foo > input$trt)*length(foo)   # shown in red
+         mean(foo > input$trt)*length(foo)   # shown in red
         
         par(mfrow=c(1,1))
         # ---------------------------------------------------------------------------
@@ -421,10 +442,9 @@ server <- shinyServer(function(input, output   ) {
       trt$diff <- trt$y.1observed - trt$y.0observed
       
       foo <- sort(trt[,"diff"])
+      A <- mean(foo < input$trt)*length(foo)   # shown in red
       
-      plot(foo, main="Individual changes in response in treated arm
-           Suggested individual differences due entirely to regression to the mean
-           and random error (within subject and measurement error)",
+      plot(foo, main="Treated arm",
            ylab= "follow up - baseline", xlab="Individual subjects order by observed response", 
            xlim=c(0,1.05*N/2), ylim=c(mi,ma), #length(trt[,"diff"])
            col=ifelse(foo > input$trt, 'black', 'blue') ) #, asp=4)
@@ -432,9 +452,10 @@ server <- shinyServer(function(input, output   ) {
      # abline(h=input$trt)
       with(trt, abline(h=mean(beta.treatment), col=c("forestgreen"), lty=c(1), lwd=c(1) ) )
       with(trt, abline(h=0, col="black", lty="dashed")) 
+      with(trt, abline(v=A, col="black", lty="dashed"))
       # this many were not observed to have reduced response by more than 5
       # wrongly labelled as 'non responders'
-      mean(foo > input$trt)*length(foo)   # shown in red
+     
       
       # ---------------------------------------------------------------------------
       
@@ -442,9 +463,9 @@ server <- shinyServer(function(input, output   ) {
       trt$diff <- trt$y.1observed - trt$y.0observed
       
       foo <- sort(trt[,"diff"])
-      plot(foo, main="Individual changes in response in control arm
-           Suggested individual differences due entirely to regression to the mean
-           and random error (within subject and measurement error)",
+      C <- mean(foo < input$trt)*length(foo)   # shown in red
+      
+      plot(foo, main="Control arm",
            ylab= "follow up - baseline", xlab="Individual subjects order by observed treatment response",
            xlim=c(0,1.05*N/2),ylim=c(mi,ma), #length(trt[,"diff"])
            col=ifelse(foo > input$trt, 'black', 'blue') )#, asp=4)
@@ -452,9 +473,10 @@ server <- shinyServer(function(input, output   ) {
      # abline(h=input$trt)
       with(trt, abline(h=mean(beta.treatment), col=c("forestgreen"), lty=c(1), lwd=c(1) ) )
       with(trt, abline(h=0, col="black", lty="dashed")) 
+      with(trt, abline(v=C, col="black", lty="dashed"))
       # this many were not observed to have reduced response by more than 5
       # wrongly labelled as 'non responders'
-      mean(foo > input$trt)*length(foo)   # shown in red
+     #C <- mean(foo > input$trt)*length(foo)   # shown in red
       
     
       #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -505,12 +527,93 @@ server <- shinyServer(function(input, output   ) {
       #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
       par(mfrow=c(1,1))
       
+      
+       
+      
     })
     
     
     
+    stats <- reactive({
+      
+      sample <- random.sample()
+      
+      trial <- make.data()$trial
+      # ---------------------------------------------------------------------------
+      N <- nrow(trt)
+      trt <- trial[trial$treat==1,]
+      trt$diff <- trt$y.1observed - trt$y.0observed
+      foo <- sort(trt[,"diff"])
+      A <- mean(foo < sample$trt)*length(foo)   # shown in red
+      AT <- round(A/length(foo)*100,1)
+      # ---------------------------------------------------------------------------
+      
+      trt <- trial[trial$treat==0,]
+      trt$diff <- trt$y.1observed - trt$y.0observed
+      foo <- sort(trt[,"diff"])
+      C <- mean(foo < sample$trt)*length(foo)   # sh
+      CT <- round(C/length(foo)*100,1)
+      
+      
+      Z <- data.frame(A=A, AT=AT, C=C, CT= CT)
+      names(Z) <- c("Observed responders trt",  "%" , "Observed responders ctrl" , "%")
+      rownames(Z) <- NULL 
+      # ---------------------------------------------------------------------------
+      return(list(A=A, AT=AT, C=C, CT= CT, Z=Z)) 
+      
+    })
+   
+  output$A <- renderPrint({
+      stats()$A
+    }) 
+    
+    output$C <- renderPrint({
+      stats()$C
+    }) 
     
     
+    
+    output$xx <- renderPrint({ 
+      
+      m  <- stats()$Z
+      
+          return(m )
+      
+    })
+    
+    
+    output$tablex <- DT::renderDataTable({
+
+      foo<- stats()$Z
+
+      #namez <- c("true baseline","observed baseline","eligible","treatment group","true treatment effect\n in treated only","
+          #        true response","observed response","delta observed")
+     # names(foo) <- namez
+      rownames(foo) <- NULL
+      library(DT)
+
+      datatable(foo,
+
+                rownames = TRUE,
+                #
+                options = list(
+                  searching = TRUE,
+                  pageLength = 15,
+                  paging=TRUE,
+                  lengthMenu = FALSE ,
+                  lengthChange = FALSE,
+                  autoWidth = FALSE,
+                  #  colReorder = TRUE,
+                  #deferRender = TRUE,
+                  # scrollY = 200,
+                  scroller = T
+                ))  %>%
+
+        formatRound(
+          columns= namez,
+          digits=c(2,2,2,2)  )
+    })
+
     
     # ---------------------------------------------------------------------------
 
